@@ -125,40 +125,6 @@ void Command::execute() {
     int defaultout = dup(1);
     int defaulterr = dup(2);
 
-    // set up input redirection
-
-    /*
-    if (_inFile) {
-      int infd = open(_inFile->c_str(), O_RDONLY);
-      if (infd < 0) {
-        perror("open input file");
-        exit(1);
-      }
-
-      dup2(infd, 0);
-      close(infd);
-    }
-
-    // set up output redirection
-    if (_outFile) {
-      int outfd;
-
-      if (_appendOut) {
-        outfd = open(_outFile->c_str(), O_WRONLY | O_CREAT | O_APPEND, 0666);
-      } else {
-        // overwrite >
-        outfd = open(_outFile->c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
-      }
-
-      if (outfd < 0) {
-        perror("open output file");
-        exit(1);
-      }
-
-      dup2(outfd, 1);
-      close(outfd);
-    }
-    */
     // set up error redirection
     if (_errFile) {
 
@@ -185,7 +151,7 @@ void Command::execute() {
     int prevPipeRead = -1;
     int lastPid = -1;
 
-    for (int i = 0l i < numCommands; i++) {
+    for (int i = 0; i < numCommands; i++) {
 
       bool isLast = (i == numCommands-1);
       if (prevPipeRead != -1) {
@@ -212,13 +178,34 @@ void Command::execute() {
           perror("pipe"); 
           exit(1);
         }
-        dup2(fdpipe[1],1);
+        dup2(fdpipe[1],1); // make stdout point to write end of pipe
         close(fdpipe[1]);
-    }
+        prevPipeRead = fdpipe[0]; // save the read end for next iteration
+      } else {
+
+        if (_outFile) {
+
+          int outfd;
+          if (_appendOut) {
+            outfd = open(_outFile->c_str(), O_WRONLY | O_CREAT | O_APPEND, 0666);
+          } else {
+            outfd = open(_outFile->c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+          }
+          if (outfd < 0) {
+            perror("open output file");
+            exit(1);
+          }
+
+          dup2(outfd, 1);
+          close(outfd);
+        } else {
+          dup2(defaultout, 1);
+        }
+      }
 
 
 
-    SimpleCommand* cmd = _simpleCommands[0];
+    SimpleCommand* cmd = _simpleCommands[i];
     int numArgs = cmd->_arguments.size();
 
     char** args = new char*[numArgs+1];
@@ -234,11 +221,18 @@ void Command::execute() {
     }
 
     if (pid == 0) {
-      execvp(args[0], args);
 
+      close(defaultin);
+      close(defaultout);
+      close(defaulterr);
+      execvp(args[0], args);
       perror("execvp");
       exit(1);
     }
+
+    lastPid = pid;
+    delete[] args;
+  }
 
     dup2(defaultin, 0);
     dup2(defaultout, 1);
@@ -246,13 +240,10 @@ void Command::execute() {
     close(defaultin);
     close(defaultout);
     close(defaulterr);
-    
+
     if (!_background) {
-      waitpid(pid,NULL,0);
+      waitpid(lastPid, NULL, 0);
     }
-
-    delete[] args;
-
     // Setup i/o redirection
     // and call exec
 
