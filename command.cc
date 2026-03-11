@@ -40,6 +40,7 @@ Command::Command() {
     _inFile = NULL;
     _errFile = NULL;
     _background = false;
+    _appendOut = false;
 }
 
 void Command::insertSimpleCommand( SimpleCommand * simpleCommand ) {

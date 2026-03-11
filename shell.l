@@ -36,6 +36,36 @@ void myunputc(int c) {
   return GREAT;
 }
 
+">>" {
+  return GREATGREAT;
+}
+
+"|" {
+  return PIPE;
+}
+
+"<" {
+  return LESS;
+}
+
+"&" {
+  return AMPERSAND;
+}
+
+"2>" {
+  return TWOGREAT;
+}
+
+">&" {
+  return GREATAMPERSAND;
+}
+
+">>&" {
+  return GREATGREATAMPERSAND;
+}
+
+
+
 [^ \t\n][^ \t\n]*  {
   /* Assume that file names have only alpha chars */
   yylval.cpp_string = new std::string(yytext);
