@@ -126,6 +126,8 @@ void Command::execute() {
     int defaulterr = dup(2);
 
     // set up input redirection
+
+    /*
     if (_inFile) {
       int infd = open(_inFile->c_str(), O_RDONLY);
       if (infd < 0) {
@@ -156,7 +158,7 @@ void Command::execute() {
       dup2(outfd, 1);
       close(outfd);
     }
-
+    */
     // set up error redirection
     if (_errFile) {
 
@@ -178,6 +180,43 @@ void Command::execute() {
 
     // Add execution here
     // For every simple command fork a new process
+
+    int numCommands = _simpleCommands.size();
+    int prevPipeRead = -1;
+    int lastPid = -1;
+
+    for (int i = 0l i < numCommands; i++) {
+
+      bool isLast = (i == numCommands-1);
+      if (prevPipeRead != -1) {
+        dup2(prevPipeRead, 0);
+        close(prevPipeRead);
+        prevPipeRead=-1;
+      } else if (_inFile) {
+        int infd = open(_inFile->c_str(), O_RDONLY);
+        if (infd < 0) {
+          perror("Open input file");
+          exit(1);
+        }
+        dup2(infd,0);
+        close(infd);
+      } else {
+        dup2(defaultin, 0);
+      }
+
+
+      if (!isLast) {
+
+        int fdpipe[2];
+        if (pipe(fdpipe) < 0) { 
+          perror("pipe"); 
+          exit(1);
+        }
+        dup2(fdpipe[1],1);
+        close(fdpipe[1]);
+    }
+
+
 
     SimpleCommand* cmd = _simpleCommands[0];
     int numArgs = cmd->_arguments.size();
