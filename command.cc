@@ -41,6 +41,7 @@ Command::Command() {
     _errFile = NULL;
     _background = false;
     _appendOut = false;
+    _ambiguousOutput = false;
 }
 
 void Command::insertSimpleCommand( SimpleCommand * simpleCommand ) {
@@ -74,6 +75,8 @@ void Command::clear() {
     _errFile = NULL;
 
     _background = false;
+    _appendOut = false;
+    _ambiguousOutput = false;
 }
 
 void Command::print() {
@@ -108,8 +111,70 @@ void Command::execute() {
         return;
     }
 
+    if (_ambiguousOutput) {
+      printf("Ambiguous output redirect.\n");
+      clear();
+      Shell::prompt();
+      return;
+    }
+
     // Print contents of Command data structure
-    print();
+    //print();
+
+    int defaultin = dup(0);
+    int defaultout = dup(1);
+    int defaulterr = dup(2);
+
+    // set up input redirection
+    if (_inFile) {
+      int infd = open(_inFile->c_str(), O_RDONLY);
+      if (infd < 0) {
+        perror("open input file");
+        exit(1);
+      }
+
+      dup2(infd, 0);
+      close(infd);
+    }
+
+    // set up output redirection
+    if (_outFile) {
+      int outfd;
+
+      if (_appendOut) {
+        outfd = open(_outFile->c_str(), O_WRONLY | O_CREAT | O_APPEND, 0666);
+      } else {
+        // overwrite >
+        outfd = open(_outFile->c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+      }
+
+      if (outfd < 0) {
+        perror("open output file");
+        exit(1);
+      }
+
+      dup2(outfd, 1);
+      close(outfd);
+    }
+
+    // set up error redirection
+    if (_errFile) {
+
+      int errfd;
+      if (_appendOut) {
+        errfd = open(_errFile->c_str(), O_WRONLY | O_CREAT | O_APPEND, 0666);
+      } else {
+        errfd = open(_errFile->c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+      }
+
+      if (errfd < 0) {
+        perror("open error file");
+        exit(1);
+      }
+
+      dup2(errfd, 2);
+      close(errfd);
+    }
 
     // Add execution here
     // For every simple command fork a new process
@@ -135,7 +200,17 @@ void Command::execute() {
       perror("execvp");
       exit(1);
     }
-    waitpid(pid,NULL,0);
+
+    dup2(defaultin, 0);
+    dup2(defaultout, 1);
+    dup2(defaulterr, 2);
+    close(defaultin);
+    close(defaultout);
+    close(defaulterr);
+    
+    if (!_background) {
+      waitpid(pid,NULL,0);
+    }
 
     delete[] args;
 

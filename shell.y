@@ -53,7 +53,7 @@ command_line: simple_command;
 
 simple_command:
   pipe_list io_modifier_list background_optional NEWLINE {
-    printf("   Yacc: Execute command\n");
+    //printf("   Yacc: Execute command\n");
     Shell::_currentCommand.execute();
   }
   | NEWLINE
@@ -74,14 +74,14 @@ arg_list:
 
 argument:
   WORD {
-    printf("   Yacc: insert argument \"%s\"\n", $1->c_str());
+    //printf("   Yacc: insert argument \"%s\"\n", $1->c_str());
     Command::_currentSimpleCommand->insertArgument( $1 );
   }
   ;
 
 command_word:
   WORD {
-    printf("   Yacc: insert command \"%s\"\n", $1->c_str());
+    //printf("   Yacc: insert command \"%s\"\n", $1->c_str());
     Command::_currentSimpleCommand = new SimpleCommand();
     Command::_currentSimpleCommand->insertArgument( $1 );
   }
@@ -101,36 +101,48 @@ io_modifier_list:
 
 io_modifier_opt:
   GREAT WORD {
-    printf("   Yacc: insert output \"%s\"\n", $2->c_str());
+    //printf("   Yacc: insert output \"%s\"\n", $2->c_str());
+    if (Shell::_currentCommand._outFile) {
+      Shell::_currentCommand._ambiguousOutput = true;
+    }
     Shell::_currentCommand._outFile = $2;
   }
   |
   GREATGREAT WORD {
-    printf("   Yacc: insert output \"%s\"\n", $2->c_str());
+    //printf("   Yacc: insert output \"%s\"\n", $2->c_str());
+    if (Shell::_currentCommand._outFile) {
+      Shell::_currentCommand._ambiguousOutput = true;
+    }
     Shell::_currentCommand._outFile = $2;
     Shell::_currentCommand._appendOut = true;
   }
   |
   TWOGREAT WORD {
-    printf("   Yacc: insert stderr \"%s\"\n", $2->c_str());
+    //printf("   Yacc: insert stderr \"%s\"\n", $2->c_str());
     Shell::_currentCommand._errFile = $2;
   }
   |
   GREATGREATAMPERSAND WORD {
-    printf("   Yacc: insert output \"%s\"\n", $2->c_str());
+    //printf("   Yacc: insert output \"%s\"\n", $2->c_str());
+    if (Shell::_currentCommand._outFile) {
+      Shell::_currentCommand._ambiguousOutput = true;
+    }
     Shell::_currentCommand._outFile = $2;
     Shell::_currentCommand._errFile = $2;
     Shell::_currentCommand._appendOut = true;
   }
   |
   GREATAMPERSAND WORD {
-    printf("   Yacc: insert output \"%s\"\n", $2->c_str());
+    //printf("   Yacc: insert output \"%s\"\n", $2->c_str());
+    if (Shell::_currentCommand._outFile) {
+      Shell::_currentCommand._ambiguousOutput = true;
+    }
     Shell::_currentCommand._outFile = $2;
     Shell::_currentCommand._errFile = $2;
   }
   |
   LESS WORD {
-    printf("   Yacc: insert input \"%s\"\n", $2->c_str());
+    //printf("   Yacc: insert input \"%s\"\n", $2->c_str());
     Shell::_currentCommand._inFile = $2;
   }
   /* can be empty */ 
