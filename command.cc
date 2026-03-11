@@ -22,6 +22,15 @@
 #include "command.hh"
 #include "shell.hh"
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <wait.h>
+
 
 Command::Command() {
     // Initialize a new vector of Simple Commands
@@ -103,6 +112,32 @@ void Command::execute() {
 
     // Add execution here
     // For every simple command fork a new process
+
+    SimpleCommand* cmd = _simpleCommands[0];
+    int numArgs = cmd->_arguments.size();
+
+    char** args = new char*[numArgs+1];
+    for (int i = 0; i < numArgs; i++) {
+      args[i] = (char*) cmd->_arguments[i]->c_str();
+    }
+    args[numArgs]=NULL;
+    int pid = fork();
+
+    if (pid < 0) {
+      perror("fork");
+      exit(1);
+    }
+
+    if (pid == 0) {
+      execvp(args[0], args);
+
+      perror("execvp");
+      exit(1);
+    }
+    waitpid(pid,NULL,0);
+
+    delete[] args;
+
     // Setup i/o redirection
     // and call exec
 
