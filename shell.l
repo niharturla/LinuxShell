@@ -64,7 +64,12 @@ void myunputc(int c) {
   return GREATGREATAMPERSAND;
 }
 
-
+\"[^\"]*\" {
+  /* Remove quotes and return contents as a single WORD */
+  yytext[yyleng-1] = '\0';        /* remove closing quote */
+  yylval.cpp_string = new std::string(yytext + 1);  /* skip opening quote */
+  return WORD;
+}
 
 [^ \t\n][^ \t\n]*  {
   /* Assume that file names have only alpha chars */
