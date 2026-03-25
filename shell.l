@@ -71,8 +71,17 @@ void myunputc(int c) {
   return WORD;
 }
 
-[^ \t\n][^ \t\n]*  {
-  /* Assume that file names have only alpha chars */
-  yylval.cpp_string = new std::string(yytext);
+(\\.|\`[^\`]*\`|[^ \t\n\"\`\\><!|&])+ {
+  /* handle escape characters */
+  std::string * s = new std::string();
+  for (int i = 0; i < yyleng; i++) {
+    if (yytext[i] == '\\') {
+      i++;  // skip the backslash
+      s->push_back(yytext[i]);  // keep the next character literally
+    } else {
+      s->push_back(yytext[i]);
+    }
+  }
+  yylval.cpp_string = s;
   return WORD;
 }
