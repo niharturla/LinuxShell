@@ -21,7 +21,7 @@ void myunputc(int c) {
 %}
 
 %option noyywrap
-
+%option stack
 %%
 
 \n {
@@ -71,6 +71,14 @@ void myunputc(int c) {
   return WORD;
 }
 
+"${"[a-zA-Z_][a-zA-Z0-9_]*"}" {
+  /* variable expansion ${VAR} */
+  std::string varName(yytext + 2, yyleng - 3);
+  char* val = getenv(varName.c_str());
+  yylval.cpp_string = new std::string(val ? val : "");
+  return WORD;
+}
+
 (\\.|\`[^\`]*\`|[^ \t\n\"\`\\><!|&])+ {
   /* handle escape characters */
   std::string * s = new std::string();
@@ -84,4 +92,11 @@ void myunputc(int c) {
   }
   yylval.cpp_string = s;
   return WORD;
+}
+
+<<EOF>> {
+    yypop_buffer_state();
+    if (!YY_CURRENT_BUFFER) {
+        yyterminate();
+    }
 }

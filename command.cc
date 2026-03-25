@@ -31,7 +31,13 @@
 #include <signal.h>
 #include <unistd.h>
 #include <wait.h>
+#include "y.tab.hh"
 
+typedef struct yy_buffer_state *YY_BUFFER_STATE;
+extern YY_BUFFER_STATE yy_create_buffer(FILE *file, int size);
+extern void yypush_buffer_state(YY_BUFFER_STATE buffer);
+extern void yypop_buffer_state();
+#define YY_BUF_SIZE 16384
 
 Command::Command() {
     // Initialize a new vector of Simple Commands
@@ -115,6 +121,58 @@ void Command::execute() {
     if ( _simpleCommands[0]->_arguments[0]->compare("exit") == 0 ) {
         printf("Good bye!!\n");
         exit(0);
+    }
+
+    if (_simpleCommands[0]->_arguments[0]->compare("setenv") == 0) {
+      if (_simpleCommands[0]->_arguments.size() >= 3) {
+        setenv(_simpleCommands[0]->_arguments[1]->c_str(),
+               _simpleCommands[0]->_arguments[2]->c_str(), 1);
+      }
+
+      clear();
+      Shell::prompt();
+      return;
+    }
+
+    if ( _simpleCommands[0]->_arguments[0]->compare("unsetenv") == 0 ) {
+      if (_simpleCommands[0]->_arguments.size() >= 2) {
+        unsetenv(_simpleCommands[0]->_arguments[1]->c_str());
+      }
+
+      clear();
+      Shell::prompt();
+      return;
+    }
+
+    if (_simpleCommands[0]->_arguments[0]->compare("cd") == 0) {
+      const char* dir;
+      if (_simpleCommands[0]->_arguments.size() >= 2) {
+        dir = _simpleCommands[0]->_arguments[1]->c_str();
+      } else {
+        dir = getenv("HOME");
+      }
+
+      if (chdir(dir) < 0) {
+        fprintf(stderr, "cd: can't cd to %s\n", dir);
+      }
+
+      clear();
+      Shell::prompt();
+      return;
+    }
+
+    if ( _simpleCommands[0]->_arguments[0]->compare("source") == 0 ) {
+      if (_simpleCommands[0]->_arguments.size() >= 2) {
+        FILE* file = fopen(_simpleCommands[0]->_arguments[1]->c_str(), "r");
+        if (file == NULL) {
+            perror("source");
+        } else {
+            yypush_buffer_state(yy_create_buffer(file, YY_BUF_SIZE));
+        }
+      }
+      clear();
+      Shell::prompt();
+      return;
     }
 
     if (_ambiguousOutput) {
@@ -231,6 +289,13 @@ void Command::execute() {
       close(defaultin);
       close(defaultout);
       close(defaulterr);
+
+      if (cmd->_arguments[0]->compare("printenv") == 0) {
+        for (int i = 0; environ[i] != NULL; i++) {
+          printf("%s\n", environ[i]);
+        }
+        exit(0);
+      }
       execvp(args[0], args);
       perror("execvp");
       exit(1);
