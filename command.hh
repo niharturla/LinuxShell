@@ -13,6 +13,7 @@ struct Command {
   bool _background;
   bool _appendOut;
   bool _ambiguousOutput;
+  static bool _running;
 
   Command();
   void insertSimpleCommand( SimpleCommand * simpleCommand );

@@ -28,6 +28,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <unistd.h>
 #include <wait.h>
 
@@ -242,7 +243,9 @@ void Command::execute() {
     close(defaulterr);
 
     if (!_background) {
+      _running=true;
       waitpid(lastPid, NULL, 0);
+      _running=false;
     }
     // Setup i/o redirection
     // and call exec
@@ -255,3 +258,5 @@ void Command::execute() {
 }
 
 SimpleCommand * Command::_currentSimpleCommand;
+bool Command::_running = false;
+
