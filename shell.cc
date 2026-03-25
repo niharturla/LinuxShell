@@ -6,6 +6,11 @@
 #include <set>
 
 int yyparse(void);
+typedef struct yy_buffer_state *YY_BUFFER_STATE;
+extern YY_BUFFER_STATE yy_create_buffer(FILE *file, int size);
+extern void yypush_buffer_state(YY_BUFFER_STATE buffer);
+extern void yypop_buffer_state();
+#define YY_BUF_SIZE 16384
 
 void Shell::prompt() {
   // adding isatty check
@@ -58,7 +63,14 @@ int main() {
     perror("sigaction");
     exit(2);
   }
-  Shell::prompt();
+
+  FILE* shellrc = fopen(".shellrc","r");
+  if (shellrc) {
+    yypush_buffer_state(yy_create_buffer(stdin, YY_BUF_SIZE));
+    yypush_buffer_state(yy_create_buffer(shellrc, YY_BUF_SIZE));
+  } else {
+    Shell::prompt();
+  }
   yyparse();
 }
 
