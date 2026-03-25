@@ -246,6 +246,8 @@ void Command::execute() {
       _running=true;
       waitpid(lastPid, NULL, 0);
       _running=false;
+    } else {
+      Shell::_backgroundPids.insert(lastPid);
     }
     // Setup i/o redirection
     // and call exec
