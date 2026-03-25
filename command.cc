@@ -323,6 +323,14 @@ void Command::execute() {
     // and call exec
 
     // Clear to prepare for next command
+
+    /* cleanup process substitutions */
+    for (auto& ps : Shell::_processSubs) {
+      waitpid(ps.pid, NULL, 0);
+      unlink(ps.fifoPath.c_str());   /* remove fifo */
+      rmdir(ps.tempDir.c_str());     /* remove temp dir */
+    }
+    Shell::_processSubs.clear();
     clear();
 
     // Print new prompt

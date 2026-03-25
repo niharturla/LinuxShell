@@ -76,4 +76,4 @@ int main() {
 
 Command Shell::_currentCommand;
 std::set<int> Shell::_backgroundPids;
-
+std::vector<ProcessSub> Shell::_processSubs;

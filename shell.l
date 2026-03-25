@@ -14,6 +14,9 @@
 #include <string>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include "shell.hh"
 
 static void yyunput(int c, char *buf_ptr);
 
@@ -146,6 +149,83 @@ void myunputc(int c) {
     /* inject output back into scanner in reverse order using myunputc */
     for (int i = output.size() - 1; i >= 0; i--) {
         myunputc(output[i]);
+    }
+}
+
+"<("[^)]*")" {
+    /* process substitution <(command) */
+
+    /* extract command between <( and ) */
+    std::string cmd(yytext + 2, yyleng - 3);
+    cmd += "\n";
+
+    /* create temp directory */
+    char tempDir[] = "/tmp/shell_XXXXXX";
+    if (mkdtemp(tempDir) == NULL) {
+        perror("mkdtemp");
+        exit(1);
+    }
+
+    /* create named pipe inside temp dir */
+    std::string fifoPath = std::string(tempDir) + "/fifo";
+    if (mkfifo(fifoPath.c_str(), 0666) < 0) {
+        perror("mkfifo");
+        exit(1);
+    }
+
+    /* block SIGCHLD so handler doesn't reap our child */
+    sigset_t mask, oldmask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGCHLD);
+    sigprocmask(SIG_BLOCK, &mask, &oldmask);
+
+    /* fork child to run the command */
+    int inputPipe[2];
+    if (pipe(inputPipe) < 0) {
+        perror("pipe");
+        exit(1);
+    }
+
+    int pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        exit(1);
+    }
+
+    if (pid == 0) {
+        /* child: read command from inputPipe */
+        dup2(inputPipe[0], 0);
+        close(inputPipe[1]);
+
+        /* redirect stdout to the named pipe */
+        int fifofd = open(fifoPath.c_str(), O_WRONLY);
+        if (fifofd < 0) {
+            perror("open fifo");
+            exit(1);
+        }
+        dup2(fifofd, 1);
+        close(fifofd);
+
+        char* args[] = {(char*)"shell", NULL};
+        execvp("/proc/self/exe", args);
+        perror("execvp");
+        exit(1);
+    }
+
+    /* parent: write command to child */
+    close(inputPipe[0]);
+    write(inputPipe[1], cmd.c_str(), cmd.size());
+    close(inputPipe[1]);
+
+    /* restore SIGCHLD */
+    sigprocmask(SIG_UNBLOCK, &mask, &oldmask);
+
+    /* store fifo path and pid for cleanup later */
+    Shell::_processSubs.push_back({fifoPath, tempDir, pid});
+
+    /* inject fifo path into scanner as a WORD */
+    for (int i = fifoPath.size() - 1; i >= 0; i--) {
+        myunputc(fifoPath[i]);
     }
 }
 
