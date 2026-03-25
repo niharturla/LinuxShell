@@ -11,11 +11,14 @@
 
 #include <cstring>
 #include "y.tab.hh"
+#include <string>
+#include <unistd.h>
+#include <sys/wait.h>
 
-static  void yyunput (int c,char *buf_ptr  );
+static void yyunput(int c, char *buf_ptr);
 
 void myunputc(int c) {
-  unput(c);
+    unput(c);
 }
 
 %}
@@ -62,6 +65,88 @@ void myunputc(int c) {
 
 ">>&" {
   return GREATGREATAMPERSAND;
+}
+
+"$("[^)]*")" {
+    /* subshell: execute command and inject output back into scanner */
+
+    /* extract command between $( and ) */
+    std::string cmd(yytext + 2, yyleng - 3);
+    cmd += "\n";  /* add newline so shell parses it */
+
+    /* two pipes: one to send command to child, one to read output */
+    int inputPipe[2];   /* parent writes command → child reads */
+    int outputPipe[2];  /* child writes output → parent reads */
+
+    if (pipe(inputPipe) < 0 || pipe(outputPipe) < 0) {
+        perror("pipe");
+        exit(1);
+    }
+
+    sigset_t mask, oldmask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGCHLD);
+    sigprocmask(SIG_BLOCK, &mask, &oldmask);
+
+    int pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        exit(1);
+    }
+
+    if (pid == 0) {
+        /* child: redirect stdin to inputPipe, stdout to outputPipe */
+        dup2(inputPipe[0], 0);   /* stdin reads from input pipe */
+        dup2(outputPipe[1], 1);  /* stdout writes to output pipe */
+
+        /* close unused ends */
+        close(inputPipe[1]);
+        close(outputPipe[0]);
+
+        /* execute our own shell as the subshell */
+        execvp("/proc/self/exe", NULL);
+        perror("execvp");
+        exit(1);
+    }
+
+    /* parent: write command to child's stdin */
+    close(inputPipe[0]);   /* close read end - parent only writes */
+    close(outputPipe[1]);  /* close write end - parent only reads */
+
+    /* write the command to the child shell */
+    write(inputPipe[1], cmd.c_str(), cmd.size());
+    close(inputPipe[1]);  /* send EOF to child */
+
+    /* read all output from child */
+    std::string output;
+    char buf[1024];
+    int bytesRead;
+    while ((bytesRead = read(outputPipe[0], buf, sizeof(buf))) > 0) {
+        output.append(buf, bytesRead);
+    }
+    close(outputPipe[0]);
+
+    /* wait for child to finish */
+    waitpid(pid, NULL, 0);
+
+    sigprocmask(SIG_UNBLOCK, &mask, &oldmask);
+
+
+    /* remove trailing newline from output */
+    while (!output.empty() && output.back() == '\n') {
+        output.pop_back();
+    }
+
+    for (int i = 0; i < output.size(); i++) {
+      if (output[i] == '\n') {
+        output[i] = ' ';
+      }
+    }
+
+    /* inject output back into scanner in reverse order using myunputc */
+    for (int i = output.size() - 1; i >= 0; i--) {
+        myunputc(output[i]);
+    }
 }
 
 \"[^\"]*\" {
