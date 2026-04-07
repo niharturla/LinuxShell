@@ -17,11 +17,40 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "shell.hh"
+#include <pwd.h>
 
 static void yyunput(int c, char *buf_ptr);
 
 void myunputc(int c) {
     unput(c);
+}
+
+static std::string expandTilde(const char* text) {
+    // bare ~ or ~/...
+    if (text[1] == '/' || text[1] == '\0') {
+        const char* home = getenv("HOME");
+        if (!home) {
+            struct passwd* pw = getpwuid(getuid());
+            home = pw ? pw->pw_dir : "";
+        }
+        return std::string(home) + (text[1] ? (text + 1) : "");
+    }
+
+    // ~username or ~username/...
+    // extract username (up to '/' or end of string)
+    std::string username;
+    int i = 1;
+    while (text[i] && text[i] != '/') {
+        username += text[i++];
+    }
+
+    struct passwd* pw = getpwnam(username.c_str());
+    if (pw) {
+        return std::string(pw->pw_dir) + (text[i] ? (text + i) : "");
+    }
+
+    // no such user — return as-is
+    return std::string(text);
 }
 
 static std::string expandVar(const std::string& name) {
@@ -258,6 +287,12 @@ static std::string expandAllVars(const char* text, int len) {
     for (int i = fifoPath.size() - 1; i >= 0; i--) {
         myunputc(fifoPath[i]);
     }
+}
+
+"~"[^ \t\n/]*("/"[^ \t\n]*)? {
+    std::string expanded = expandTilde(yytext);
+    yylval.cpp_string = new std::string(expanded);
+    return WORD;
 }
 
 \"[^\"]*\" {
