@@ -312,17 +312,27 @@ void Command::execute() {
     close(defaultout);
     close(defaulterr);
 
-    if (!_background) {
+     if (!_background) {
       _running=true;
-      waitpid(lastPid, NULL, 0);
-      _running=false;
+       int status;
+       waitpid(lastPid, &status, 0);
+       _running=false;
+       Shell::_lastReturnCode = WIFEXITED(status) ? WEXITSTATUS(status) : 1;
     } else {
-      Shell::_backgroundPids.insert(lastPid);
+       Shell::_lastBackgroundPid = lastPid;
+       Shell::_backgroundPids.insert(lastPid);
     }
     // Setup i/o redirection
     // and call exec
 
     // Clear to prepare for next command
+
+    if (!_simpleCommands.empty()) {
+      auto& lastCmd = _simpleCommands.back();
+      if (!lastCmd->_arguments.empty()) {
+        Shell::_lastArg = *lastCmd->_arguments.back();
+       }
+    }
 
     /* cleanup process substitutions */
     for (auto& ps : Shell::_processSubs) {

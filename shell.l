@@ -24,6 +24,37 @@ void myunputc(int c) {
     unput(c);
 }
 
+static std::string expandVar(const std::string& name) {
+    if (name == "$") return std::to_string(getpid());
+    if (name == "?") return std::to_string(Shell::_lastReturnCode);
+    if (name == "!") return std::to_string(Shell::_lastBackgroundPid);
+    if (name == "_") return Shell::_lastArg;
+    if (name == "SHELL") return Shell::_shellPath;
+    const char* val = getenv(name.c_str());
+    return val ? val : "";
+}
+
+static std::string expandAllVars(const char* text, int len) {
+    std::string result;
+    for (int i = 0; i < len; i++) {
+        if (text[i] == '$' && i + 1 < len && text[i+1] == '{') {
+            // find closing '}'
+            int j = i + 2;
+            while (j < len && text[j] != '}') j++;
+            std::string varName(text + i + 2, j - (i + 2));
+            result += expandVar(varName);
+            i = j; // skip past '}'
+        } else if (text[i] == '\\' && i + 1 < len) {
+            i++;
+            result += text[i]; // literal next char
+        } else {
+            result += text[i];
+        }
+    }
+    return result;
+}
+
+
 %}
 
 %option noyywrap
@@ -236,26 +267,16 @@ void myunputc(int c) {
   return WORD;
 }
 
-"${"[a-zA-Z_][a-zA-Z0-9_]*"}" {
-  /* variable expansion ${VAR} */
+"${"[^}]*"}" {
   std::string varName(yytext + 2, yyleng - 3);
-  char* val = getenv(varName.c_str());
-  yylval.cpp_string = new std::string(val ? val : "");
-  return WORD;
+  std::string value = expandVar(varName);
+  for (int i = (int)value.size() - 1; i >= 0; i--) {
+      myunputc(value[i]);
+  }
 }
 
-(\\.|\`[^\`]*\`|[^ \t\n\"\`\\>\\|&])+ {
-  /* handle escape characters */
-  std::string * s = new std::string();
-  for (int i = 0; i < yyleng; i++) {
-    if (yytext[i] == '\\') {
-      i++;  // skip the backslash
-      s->push_back(yytext[i]);  // keep the next character literally
-    } else {
-      s->push_back(yytext[i]);
-    }
-  }
-  yylval.cpp_string = s;
+(\\.|\`[^\`]*\`|[^ \t\n\"\`\\>|&])+ {
+  yylval.cpp_string = new std::string(expandAllVars(yytext, yyleng));
   return WORD;
 }
 

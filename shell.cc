@@ -12,6 +12,11 @@ extern void yypush_buffer_state(YY_BUFFER_STATE buffer);
 extern void yypop_buffer_state();
 #define YY_BUF_SIZE 16384
 
+int Shell::_lastReturnCode = 0;
+int Shell::_lastBackgroundPid = 0;
+std::string Shell::_lastArg = "";
+std::string Shell::_shellPath = "";
+
 void Shell::prompt() {
   // adding isatty check
   if (isatty(0)) {
@@ -43,6 +48,10 @@ extern "C" void sigChildHandler( int sig) {
 }
 
 int main() {
+
+  char* resolved = realpath("/proc/self/exe", nullptr);
+  Shell::_shellPath = resolved ? resolved : "proc/self/exe";
+  free(resolved);
 
   struct sigaction sa;
   sa.sa_handler = handler;
