@@ -12,12 +12,40 @@
 #include <cstring>
 #include "y.tab.hh"
 #include <string>
+#include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "shell.hh"
 #include <pwd.h>
+
+extern "C" char * read_line();
+
+int mygetc(FILE* f) {
+
+  static char *p;
+  char ch;
+
+  if (!isatty(0)) {
+    return getc(f);
+  }
+
+  if (p==NULL || *p == 0) {
+    char *s = read_line();
+    p = s;
+  }
+
+  ch = *p;
+  p++;
+
+  return ch;
+
+}
+
+#undef getc
+#define getc(f) mygetc(f)
+
 
 static void yyunput(int c, char *buf_ptr);
 
