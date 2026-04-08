@@ -37,6 +37,7 @@ typedef struct yy_buffer_state *YY_BUFFER_STATE;
 extern YY_BUFFER_STATE yy_create_buffer(FILE *file, int size);
 extern void yypush_buffer_state(YY_BUFFER_STATE buffer);
 extern void yypop_buffer_state();
+extern "C" void add_to_history(char * line);
 #define YY_BUF_SIZE 16384
 
 Command::Command() {
@@ -113,6 +114,16 @@ void Command::print() {
 
 void Command::execute() {
     // Don't do anything if there are no simple commands
+
+    std::string full_command = "";
+    for (auto arg: _simpleCommands[0]->_arguments) {
+      full_command += *arg + " ";
+    }
+
+    if (!full_command.empty()) {
+      add_to_history((char *)full_command.c_str());
+    }
+
     if ( _simpleCommands.size() == 0 ) {
         Shell::prompt();
         return;
